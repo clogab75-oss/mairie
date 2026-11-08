@@ -1,10 +1,10 @@
-create or replace function public.discord_send(p_kind text, p_body jsonb) returns void
+create or replace function public.discord_send(p_kind text, p_body jsonb, p_hook text default 'discord_webhook') returns void
 language plpgsql security definer set search_path = public, extensions as $$
 declare
   v_url text;
   v_enabled boolean;
 begin
-  select value into v_url from public.private_settings where key = 'discord_webhook';
+  select value into v_url from public.private_settings where key = p_hook;
   if v_url is null or btrim(v_url) = '' then return; end if;
 
   select coalesce((value #>> '{}')::boolean, true) into v_enabled
@@ -28,26 +28,33 @@ language sql security definer set search_path = public as $$
   select public.discord_send(p_kind, jsonb_build_object('content', left(p_content, 1900)));
 $$;
 
-create or replace function public.discord_embed(p_kind text, p_content text, p_embed jsonb) returns void
+create or replace function public.discord_embed(p_kind text, p_content text, p_embed jsonb, p_hook text default 'discord_webhook') returns void
 language sql security definer set search_path = public as $$
   select public.discord_send(p_kind, jsonb_build_object(
     'content', left(coalesce(p_content, ''), 1900),
-    'embeds', jsonb_build_array(p_embed)));
+    'embeds', jsonb_build_array(p_embed)), p_hook);
 $$;
 
-revoke all on function public.discord_send(text,jsonb) from public, anon, authenticated;
+revoke all on function public.discord_send(text,jsonb,text) from public, anon, authenticated;
 revoke all on function public.discord_notify(text,text) from public, anon, authenticated;
-revoke all on function public.discord_embed(text,text,jsonb) from public, anon, authenticated;
+revoke all on function public.discord_embed(text,text,jsonb,text) from public, anon, authenticated;
 
-create or replace function public.admin_test_discord() returns void
+create or replace function public.admin_test_discord(p_target text default 'notifications') returns void
 language plpgsql security definer set search_path = public, extensions as $$
 begin
   if not public.is_mayor() then raise exception 'Action réservée au maire'; end if;
-  perform public.discord_notify('test', E'🏛️ **TEST – MAIRIE D''AMBOISE**\n\nLe webhook Discord fonctionne correctement.');
+  if p_target = 'announcements' then
+    perform public.discord_embed('test', '', jsonb_build_object(
+      'title', '📢 TEST – ANNONCES CITOYENNES',
+      'description', 'Le webhook des annonces fonctionne correctement.',
+      'color', 13214247), 'discord_webhook_announcements');
+  else
+    perform public.discord_notify('test', E'🏛️ **TEST – MAIRIE D''AMBOISE**\n\nLe webhook des notifications fonctionne correctement.');
+  end if;
 end $$;
 
-revoke all on function public.admin_test_discord() from public, anon;
-grant execute on function public.admin_test_discord() to authenticated;
+revoke all on function public.admin_test_discord(text) from public, anon;
+grant execute on function public.admin_test_discord(text) to authenticated;
 
 create or replace function public.log_history(p_mandate uuid, p_msg text) returns void
 language plpgsql security definer set search_path = public as $$
@@ -319,16 +326,24 @@ create or replace function public.announcements_after_insert() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare
   v_embed jsonb;
+  v_emoji text;
+  v_label text;
+  v_color int;
 begin
   insert into public.notifications (user_id, type, title, body)
-  select id, 'announcement', 'Nouvelle annonce', left(new.title, 120)
+  select id, 'announcement', 'Nouvelle annonce citoyenne', left(new.title, 120)
   from public.profiles
   where is_active and role is not null and id is distinct from auth.uid();
 
+  v_emoji := case new.category when 'evenement' then '🎉' when 'travaux' then '🚧' when 'securite' then '🛡️' when 'urgent' then '🚨' else 'ℹ️' end;
+  v_label := case new.category when 'evenement' then 'Événement' when 'travaux' then 'Travaux' when 'securite' then 'Sécurité' when 'urgent' then 'Urgent' else 'Information' end;
+  v_color := case new.category when 'evenement' then 10181046 when 'travaux' then 15105570 when 'securite' then 1752220 when 'urgent' then 15158332 else 3447003 end;
+
   v_embed := jsonb_build_object(
-    'title', '📢 ' || left(new.title, 240),
+    'title', v_emoji || ' ' || left(new.title, 240),
     'description', left(new.body, 3800),
-    'color', 13214247,
+    'color', v_color,
+    'author', jsonb_build_object('name', 'Annonce citoyenne – ' || v_label),
     'footer', jsonb_build_object('text', 'Mairie d''Amboise – ' || coalesce(new.author_name, 'Mairie')),
     'timestamp', to_char(new.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
   );
@@ -336,7 +351,7 @@ begin
     v_embed := v_embed || jsonb_build_object('image', jsonb_build_object('url', new.image_url));
   end if;
 
-  perform public.discord_embed('announcement', '', v_embed);
+  perform public.discord_embed('announcement', '', v_embed, 'discord_webhook_announcements');
   return new;
 end $$;
 

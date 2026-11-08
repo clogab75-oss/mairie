@@ -182,6 +182,10 @@ create table if not exists public.announcements (
   updated_at timestamptz not null default now()
 );
 
+alter table public.announcements
+  add column if not exists category text not null default 'information'
+  check (category in ('information','evenement','travaux','securite','urgent'));
+
 create index if not exists mandates_status_idx on public.mandates (status);
 create index if not exists mandates_service_idx on public.mandates (service);
 create index if not exists mandates_created_idx on public.mandates (created_at desc);
@@ -221,7 +225,9 @@ insert into public.settings (key, value) values
   ('notify_announcement', to_jsonb(true))
 on conflict (key) do nothing;
 
-insert into public.private_settings (key, value) values ('discord_webhook', '')
+insert into public.private_settings (key, value) values
+  ('discord_webhook', ''),
+  ('discord_webhook_announcements', '')
 on conflict (key) do nothing;
 
 create or replace function public.set_updated_at() returns trigger

@@ -1,5 +1,6 @@
 import { sb, can, markNotifsRead } from '../state.js';
-import { esc, toast, errMsg, fmtDT, openModal, openImage, confirmBox, busy } from '../lib.js';
+import { esc, toast, errMsg, openModal, confirmBox, busy } from '../lib.js';
+import { CATEGORIES, announcementCard, filterChips, bindAnnouncements } from '../announcement-ui.js';
 
 const BUCKET = 'announcements';
 const MAX_SIZE = 5 * 1024 * 1024;
@@ -11,39 +12,26 @@ export default async function render(view, ctx) {
   let limit = STEP;
   let more = false;
 
-  const card = (a) => `
-    <article class="card announce">
-      ${a.image_url ? `<img class="announce-img" src="${esc(a.image_url)}" alt="" data-img="${esc(a.id)}">` : ''}
-      <div class="card-head">
-        <h2>${esc(a.title)}</h2>
-        ${can.mayor() ? `<div class="btn-row">
-          <button class="btn sm ghost" data-edit="${esc(a.id)}">Modifier</button>
-          <button class="btn sm bad" data-del="${esc(a.id)}">Supprimer</button></div>` : ''}
-      </div>
-      <p class="muted small" style="margin-top:0">${esc(a.author_name || 'Mairie')} · ${esc(fmtDT(a.created_at))}</p>
-      <div class="announce-body">${esc(a.body)}</div>
-    </article>`;
+  let cat = '';
 
   function paint() {
+    const rows = cat ? items.filter((a) => a.category === cat) : items;
     view.innerHTML = `
       <div class="page-head">
-        <div><h1>Annonces</h1><p>Communications officielles de la Mairie d'Amboise.</p></div>
+        <div><h1>Annonces citoyennes</h1><p>Communications officielles de la Mairie d'Amboise, visibles aussi sur la page d'accueil publique.</p></div>
         ${can.mayor() ? '<button class="btn gold" id="newAnn">+ Nouvelle annonce</button>' : ''}
       </div>
-      ${items.length ? items.map(card).join('') : '<div class="card empty">Aucune annonce pour le moment.</div>'}
-      ${more ? '<div class="center"><button class="btn ghost" id="moreAnn">Voir les annonces précédentes</button></div>' : ''}`;
+      <div style="margin-bottom:20px">${filterChips(cat)}</div>
+      ${rows.length ? `<div class="ann-grid">${rows.map((a) => announcementCard(a, { manage: can.mayor() })).join('')}</div>`
+        : '<div class="card empty">Aucune annonce pour le moment.</div>'}
+      ${more && !cat ? '<div class="center" style="margin-top:24px"><button class="btn ghost" id="moreAnn">Voir les annonces précédentes</button></div>' : ''}`;
 
     view.querySelector('#newAnn')?.addEventListener('click', () => openForm(null));
     view.querySelector('#moreAnn')?.addEventListener('click', async () => { limit += STEP; await load(); });
-    view.querySelectorAll('[data-img]').forEach((el) => {
-      el.onclick = () => { const a = items.find((x) => x.id === el.dataset.img); if (a) openImage(a.image_url, a.title); };
+    view.querySelectorAll('.fchip').forEach((b) => {
+      b.onclick = () => { cat = b.dataset.cat; paint(); };
     });
-    view.querySelectorAll('[data-edit]').forEach((b) => {
-      b.onclick = () => openForm(items.find((x) => x.id === b.dataset.edit));
-    });
-    view.querySelectorAll('[data-del]').forEach((b) => {
-      b.onclick = () => remove(items.find((x) => x.id === b.dataset.del));
-    });
+    bindAnnouncements(view, rows, { onEdit: openForm, onDelete: remove });
   }
 
   async function load() {
@@ -71,6 +59,9 @@ export default async function render(view, ctx) {
       wide: true,
       body: `<form id="annForm">
         <label>Titre<input name="title" maxlength="200" required value="${esc(a?.title || '')}"></label>
+        <label>Catégorie<select name="category">
+          ${Object.entries(CATEGORIES).map(([k, v]) => `<option value="${k}" ${(a?.category || 'information') === k ? 'selected' : ''}>${v.emoji} ${esc(v.label)}</option>`).join('')}
+        </select></label>
         <label>Message<textarea name="body" rows="8" maxlength="3800">${esc(a?.body || '')}</textarea></label>
         <label>Image (facultative : JPG, PNG, WEBP ou GIF, 5 Mo maximum)
           <input type="file" id="annFile" accept="image/jpeg,image/png,image/webp,image/gif"></label>
@@ -78,7 +69,7 @@ export default async function render(view, ctx) {
         ${a?.image_url ? `<label class="check"><input type="checkbox" id="annRemove"> Retirer l'image</label>` : ''}
         <p class="muted small">${a
           ? "La modification n'est pas renvoyée sur Discord."
-          : "L'annonce sera aussi publiée sur Discord si le webhook est configuré."}</p>
+          : "L'annonce sera visible par tous les visiteurs et publiée sur Discord si le webhook des annonces est configuré."}</p>
       </form>`,
       footer: '<button class="btn ghost" data-close>Annuler</button><button class="btn gold" id="annSave">Publier</button>',
     });
@@ -98,6 +89,7 @@ export default async function render(view, ctx) {
       const fd = new FormData(form);
       const title = String(fd.get('title') || '').trim();
       const body = String(fd.get('body') || '').trim();
+      const category = String(fd.get('category') || 'information');
       if (!title) return toast('Le titre est obligatoire.', 'error');
 
       let image_path = a?.image_path ?? null;
@@ -117,7 +109,7 @@ export default async function render(view, ctx) {
           image_url = null;
         }
 
-        const payload = { title, body, image_path, image_url };
+        const payload = { title, body, category, image_path, image_url };
         const { error } = a
           ? await sb.from('announcements').update(payload).eq('id', a.id)
           : await sb.from('announcements').insert(payload);

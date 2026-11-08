@@ -1,5 +1,6 @@
 import { sb, state, can } from '../state.js';
 import { esc, fmtDT, roleBadge, ROLE_LABEL } from '../lib.js';
+import { catBadge } from '../announcement-ui.js';
 import { mandatesTable, bindRowLinks, personName } from '../data.js';
 
 const countMandates = async (status) => {
@@ -21,13 +22,14 @@ const notifLink = (n) => {
 
 const announcementsCard = (list) => `
   <div class="card">
-    <div class="card-head"><h2>📢 Dernières annonces</h2><a href="#/annonces">Tout voir</a></div>
+    <div class="card-head"><h2>📢 Annonces citoyennes</h2><a href="#/annonces">Tout voir</a></div>
     ${list.length ? list.map((a) => `
-      <div class="list-item"><div>
+      <a class="list-item" href="#/annonces" style="color:inherit;text-decoration:none"><div>
+        <div style="margin-bottom:4px">${catBadge(a.category)}</div>
         <b>${esc(a.title)}</b>
         <div class="muted small">${esc(a.author_name || 'Mairie')} · ${esc(fmtDT(a.created_at))}</div>
         <div class="small" style="margin-top:4px">${esc((a.body || '').slice(0, 160))}${(a.body || '').length > 160 ? '…' : ''}</div>
-      </div>${a.image_url ? `<img src="${esc(a.image_url)}" alt="" style="width:84px;height:56px;object-fit:cover;border-radius:8px;flex:none">` : ''}</div>`).join('')
+      </div>${a.image_url ? `<img src="${esc(a.image_url)}" alt="" style="width:84px;height:56px;object-fit:cover;border-radius:10px;flex:none">` : ''}</a>`).join('')
       : '<div class="empty">Aucune annonce.</div>'}
   </div>`;
 
@@ -40,14 +42,19 @@ export default async function render(view) {
     const force = can.force();
     const showMandates = can.viewMandates();
 
-    const annP = sb.from('announcements').select('id,title,body,image_url,author_name,created_at')
+    const annP = sb.from('announcements').select('id,title,body,category,image_url,author_name,created_at')
       .order('created_at', { ascending: false }).limit(3);
 
+    const hour = new Date().getHours();
     const head = `
-      <div class="page-head">
-        <div><h1>Bonjour ${esc(p.prenom)}</h1><p>${roleBadge(p.role)} · Portail de la Mairie d'Amboise</p></div>
-        ${can.createMandate() ? '<a class="btn gold" href="#/mandats/nouveau">+ Nouvelle demande de mandat</a>' : ''}
-      </div>`;
+      <section class="welcome">
+        <div>
+          <span class="eyebrow">${hour >= 18 || hour < 5 ? 'Bonsoir' : 'Bonjour'}</span>
+          <h1>${esc(p.prenom)} ${esc(p.nom)}</h1>
+          <p>${roleBadge(p.role)} <span>Portail de ${esc(state.settings.mairie_name)}</span></p>
+        </div>
+        ${can.createMandate() ? '<a class="btn gold lg" href="#/mandats/nouveau">+ Nouvelle demande de mandat</a>' : ''}
+      </section>`;
 
     if (mayor) {
       const [pending, accepted, refused, ann, latest, hist] = await Promise.all([

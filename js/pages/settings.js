@@ -8,14 +8,17 @@ const TOGGLES = [
   ['notify_new', 'Nouvelle demande de mandat'],
   ['notify_decision', 'Mandat accepté ou refusé'],
   ['notify_message', 'Nouveau message dans un dossier'],
-  ['notify_announcement', 'Nouvelle annonce'],
+  ['notify_announcement', 'Publier les annonces citoyennes sur Discord'],
   ['discord_message_preview', 'Afficher un aperçu du message dans Discord (déconseillé)'],
 ];
 
 export default async function render(view) {
   const me = state.user.id;
-  const { data: wh } = await sb.from('private_settings').select('value').eq('key', 'discord_webhook').maybeSingle();
-  const webhook = wh?.value || '';
+  const { data: whs } = await sb.from('private_settings').select('key,value').in('key', ['discord_webhook', 'discord_webhook_announcements']);
+  const hooks = Object.fromEntries((whs || []).map((r) => [r.key, r.value || '']));
+  const webhook = hooks.discord_webhook || '';
+  const webhookAnn = hooks.discord_webhook_announcements || '';
+  const HOOK_RE = /^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//;
 
   const draw = () => {
     const s = state.settings;
@@ -59,14 +62,17 @@ export default async function render(view) {
 
       <form class="card" id="discordForm">
         <h2>Discord</h2>
-        <label>URL du webhook
+        <label>Webhook des notifications (mandats, décisions, messages)
           <input name="webhook" type="text" autocomplete="off" placeholder="https://discord.com/api/webhooks/…" value="${esc(webhook)}"></label>
-        <p class="muted small" style="margin-top:-6px">L'adresse du webhook n'est visible que par le maire et n'apparaît jamais dans le code public du site.</p>
+        <label>Webhook des annonces citoyennes
+          <input name="webhookAnn" type="text" autocomplete="off" placeholder="https://discord.com/api/webhooks/…" value="${esc(webhookAnn)}"></label>
+        <p class="muted small" style="margin-top:-6px">Utilisez deux salons différents : les annonces ne sont jamais envoyées dans le salon des notifications. Ces adresses ne sont visibles que par le maire.</p>
         <div style="margin:8px 0 14px">${TOGGLES.map(([k, l]) => `
           <label class="check"><input type="checkbox" name="${k}" ${s[k] ? 'checked' : ''}> ${esc(l)}</label>`).join('')}</div>
         <div class="btn-row">
           <button class="btn gold" type="submit">Enregistrer</button>
-          <button class="btn ghost" type="button" id="testDiscord">Envoyer un message de test</button>
+          <button class="btn ghost" type="button" id="testDiscord">Tester les notifications</button>
+          <button class="btn ghost" type="button" id="testDiscordAnn">Tester les annonces</button>
         </div>
       </form>`;
 
@@ -98,12 +104,17 @@ export default async function render(view) {
     discord.onsubmit = async (e) => {
       e.preventDefault();
       const url = discord.webhook.value.trim();
-      if (url && !/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//.test(url)) {
-        return toast("Cette adresse n'est pas un webhook Discord valide.", 'error');
+      const urlAnn = discord.webhookAnn.value.trim();
+      if ((url && !HOOK_RE.test(url)) || (urlAnn && !HOOK_RE.test(urlAnn))) {
+        return toast("Une des adresses n'est pas un webhook Discord valide.", 'error');
       }
       const rows = TOGGLES.map(([k]) => ({ key: k, value: discord[k].checked, updated_by: me }));
       await busy(discord.querySelector('button[type=submit]'), async () => {
-        const a = await sb.from('private_settings').upsert({ key: 'discord_webhook', value: url, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+        const now = new Date().toISOString();
+        const a = await sb.from('private_settings').upsert([
+          { key: 'discord_webhook', value: url, updated_at: now },
+          { key: 'discord_webhook_announcements', value: urlAnn, updated_at: now },
+        ], { onConflict: 'key' });
         if (a.error) return toast(errMsg(a.error), 'error');
         const b = await sb.from('settings').upsert(rows, { onConflict: 'key' });
         if (b.error) return toast(errMsg(b.error), 'error');
@@ -112,11 +123,15 @@ export default async function render(view) {
       });
     };
 
-    view.querySelector('#testDiscord').onclick = (e) => busy(e.currentTarget, async () => {
-      const { error } = await sb.rpc('admin_test_discord');
-      if (error) return toast(errMsg(error), 'error');
-      toast("Message de test envoyé. Vérifiez votre salon Discord (enregistrez d'abord le webhook).", 'ok');
-    });
+    const testHook = (id, target, label) => {
+      view.querySelector(id).onclick = (e) => busy(e.currentTarget, async () => {
+        const { error } = await sb.rpc('admin_test_discord', { p_target: target });
+        if (error) return toast(errMsg(error), 'error');
+        toast(`Message de test envoyé (${label}). Enregistrez d'abord le webhook, puis vérifiez votre salon Discord.`, 'ok');
+      });
+    };
+    testHook('#testDiscord', 'notifications', 'notifications');
+    testHook('#testDiscordAnn', 'announcements', 'annonces');
 
     view.querySelectorAll('[data-img]').forEach((input) => {
       input.onchange = async () => {

@@ -1,10 +1,10 @@
 # Portail administratif – Mairie d'Amboise (Nova Life RP)
 
-Site web de gestion administrative pour la Mairie d'Amboise : mandats et perquisitions, conversations privées par dossier, annonces, historique, PDF officiel et notifications Discord.
+Site web de gestion administrative pour la Mairie d'Amboise : mandats et perquisitions, conversations privées par dossier, annonces citoyennes publiques, historique, PDF officiel et notifications Discord.
 
 - Hébergement : GitHub Pages (site statique, aucun serveur à payer)
 - Base de données, comptes, fichiers et temps réel : Supabase
-- Notifications : webhook Discord
+- Notifications : deux webhooks Discord (notifications internes et annonces)
 
 ## Contenu du dépôt
 
@@ -96,22 +96,18 @@ export const LOGIN_DOMAIN = 'amboise-rp.fr';
 
 Le fichier `.env.example` rappelle simplement les valeurs à renseigner. Le site étant statique, c'est `js/config.js` qui est lu.
 
-## 8. Configurer le webhook Discord
+## 8. Configurer les webhooks Discord
 
-1. Dans Discord, ouvrez les paramètres du salon voulu → **Intégrations → Webhooks → Nouveau webhook**.
-2. Copiez l'URL du webhook.
-3. Sur le site, connectez-vous en tant que maire → **Paramètres → Discord**, collez l'URL, cochez les notifications souhaitées et cliquez sur **Enregistrer**.
-4. Cliquez sur **Envoyer un message de test**.
+Deux salons distincts sont recommandés : un pour les notifications internes (mandats, décisions, messages) et un pour les annonces citoyennes.
 
-L'URL du webhook est enregistrée dans une table lisible uniquement par le maire. Elle n'apparaît jamais dans le code public du site, et ce sont des déclencheurs côté base de données qui appellent Discord.
+1. Dans Discord, pour chaque salon : paramètres du salon → **Intégrations → Webhooks → Nouveau webhook**, puis copiez l'URL.
+2. Sur le site, connectez-vous en tant que maire → **Paramètres → Discord**.
+3. Collez l'URL du salon des notifications dans « Webhook des notifications » et celle du salon des annonces dans « Webhook des annonces citoyennes ».
+4. Cochez les notifications souhaitées, cliquez sur **Enregistrer**, puis sur **Tester les notifications** et **Tester les annonces**.
 
-Messages envoyés :
+Les annonces ne sont jamais envoyées dans le salon des notifications : sans webhook d'annonces, elles restent uniquement sur le site.
 
-- nouvelle demande de mandat
-- mandat accepté
-- mandat refusé (avec le motif)
-- nouveau message dans un dossier (auteur et numéro de mandat, sans le contenu par défaut)
-- nouvelle annonce (titre, texte et image)
+Les URLs sont enregistrées dans une table lisible uniquement par le maire. Elles n'apparaissent jamais dans le code public du site, et ce sont des déclencheurs côté base de données qui appellent Discord.
 
 ## 9. Créer le compte de Gabin Muller
 
@@ -138,9 +134,10 @@ Le site utilise des adresses du type `#/mandats`, ce qui est compatible avec Git
 - **Mandats** : un chef Police ou Gendarmerie crée la demande, choisit les agents (Police et Gendarmerie) qui auront accès au dossier et à sa conversation, puis le maire accepte ou refuse. Un mandat accepté reste modifiable, chaque changement est enregistré dans l'historique.
 - **Conversation** : messages en temps réel, photos JPG, PNG, WEBP et PDF, aperçu, téléchargement, statut de lecture.
 - **PDF** : le bouton *Télécharger l'autorisation de perquisition* apparaît sur un mandat accepté.
-- **Annonces** : le maire publie une annonce (titre, texte, image facultative). Elle apparaît sur le site pour tous les comptes et part sur Discord. Les images se choisissent depuis le formulaire.
+- **Page d'accueil publique** : tout visiteur voit les annonces citoyennes sans se connecter (`#/` et `#/annonces`). L'espace agents se trouve sous le bouton « Espace agents » (`#/connexion`).
+- **Annonces citoyennes** : le maire publie une annonce (titre, catégorie Information, Événement, Travaux, Sécurité ou Urgent, texte, image facultative). Elle apparaît sur l'accueil public et dans le portail, et part sur Discord via le webhook des annonces.
 - **Employés de mairie** : le maire choisit les accès de chaque employé (mandats, documents, historique) à la création ou à la modification du compte.
-- **Paramètres** : nom de la mairie et du maire, logo, tampon, signature, webhook Discord, numérotation des mandats, textes du PDF.
+- **Paramètres** : nom de la mairie et du maire, logo, tampon, signature, webhooks Discord, numérotation des mandats, textes du PDF.
 
 ## Dépannage
 

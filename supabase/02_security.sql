@@ -322,8 +322,8 @@ create policy settings_delete on public.settings for delete to authenticated usi
 create policy private_settings_all on public.private_settings for all to authenticated
   using (public.is_mayor()) with check (public.is_mayor());
 
-create policy announcements_select on public.announcements for select to authenticated
-  using (public.is_active_user());
+create policy announcements_select on public.announcements for select to anon, authenticated
+  using (true);
 create policy announcements_insert on public.announcements for insert to authenticated
   with check (public.is_mayor());
 create policy announcements_update on public.announcements for update to authenticated
@@ -331,7 +331,12 @@ create policy announcements_update on public.announcements for update to authent
 create policy announcements_delete on public.announcements for delete to authenticated
   using (public.is_mayor());
 
+create policy settings_public on public.settings for select to anon
+  using (key in ('mairie_name','maire_name','maire_title','logo_path','signature_path'));
+
 revoke all on all tables in schema public from anon;
+grant select on public.announcements to anon;
+grant select on public.settings to anon;
 
 create or replace function public.search_mandates(
   p_q text default null,

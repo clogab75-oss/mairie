@@ -1,4 +1,4 @@
-import { sb, state, can, loadSession, markNotifsRead } from './state.js';
+import { sb, state, can, loadSession, loadSettings, markNotifsRead } from './state.js';
 import { $, $$, esc, toast, initials, ROLE_LABEL, ROLE_SERVICE, fmtDT, errMsg } from './lib.js';
 import { brandURL } from './branding.js';
 
@@ -19,10 +19,17 @@ const ROUTES = [
   { re: /^\/parametres$/, page: 'settings', nav: 'parametres', ok: () => can.mayor() },
 ];
 
+const PUBLIC = [
+  { re: /^\/$/, all: false, nav: 'home' },
+  { re: /^\/annonces$/, all: true, nav: 'annonces' },
+];
+
 let cleanup = null;
 let renderId = 0;
 let notifChan = null;
-let booted = false;
+let mode = 'boot';
+let pendingTarget = '';
+let pendingNotice = '';
 
 const root = () => $('#app');
 
@@ -39,8 +46,9 @@ export const go = (hash) => { location.hash = hash; };
 
 async function showLogin(notice = '') {
   teardown();
+  mode = 'login';
   const { default: renderLogin } = await import('./pages/login.js');
-  renderLogin(root(), { notice, onDone: start });
+  renderLogin(root(), { notice, onDone: afterLogin });
 }
 
 function teardown() {
@@ -53,24 +61,106 @@ async function logout() {
   teardown();
   await sb.auth.signOut();
   state.user = null; state.profile = null; state.notifs = [];
-  location.hash = '#/';
-  showLogin();
+  mode = 'public';
+  root().innerHTML = '';
+  if (location.hash === '#/' || !location.hash) route(); else location.hash = '#/';
 }
 
-async function start() {
+async function afterLogin() {
   let res;
   try { res = await loadSession(); } catch (e) { return showLogin(`Erreur de chargement : ${errMsg(e)}`); }
-  if (res === false) return showLogin();
+  if (res === true) return enterApp();
   if (res === 'missing' || res === 'inactive') {
     await sb.auth.signOut();
     return showLogin(res === 'inactive'
       ? 'Votre compte est désactivé. Contactez le maire.'
       : 'Profil introuvable. Contactez le maire.');
   }
+  return showLogin();
+}
+
+function enterApp() {
+  teardown();
+  mode = 'app';
   drawShell();
   subscribeNotifs();
-  if (!booted) { window.addEventListener('hashchange', route); booted = true; }
+  const target = pendingTarget || '#/';
+  pendingTarget = '';
+  if (location.hash !== target) location.hash = target;
+  routeApp();
+}
+
+async function boot() {
+  try { await loadSettings(); } catch (e) { console.error(e); }
+  let res = false;
+  try { res = await loadSession(); } catch (e) { console.error(e); }
+  if (res === true) { mode = 'app'; drawShell(); subscribeNotifs(); routeApp(); return; }
+  if (res === 'missing' || res === 'inactive') {
+    await sb.auth.signOut();
+    pendingNotice = res === 'inactive' ? 'Votre compte est désactivé. Contactez le maire.' : 'Profil introuvable. Contactez le maire.';
+    mode = 'public';
+    location.hash = '#/connexion';
+  }
+  mode = mode === 'boot' ? 'public' : mode;
   route();
+}
+
+function route() {
+  if (mode === 'app') return routeApp();
+  if (mode === 'boot') return undefined;
+  const { path } = parseHash();
+  if (path === '/connexion') {
+    if (mode !== 'login') { const n = pendingNotice; pendingNotice = ''; showLogin(n); }
+    return undefined;
+  }
+  const m = PUBLIC.find((r) => r.re.test(path));
+  if (!m) {
+    pendingTarget = location.hash;
+    pendingNotice = 'Connectez-vous pour accéder à cet espace.';
+    go('#/connexion');
+    return undefined;
+  }
+  return routePublic(m);
+}
+
+function drawPublicShell() {
+  const s = state.settings;
+  root().innerHTML = `
+  <div class="pub">
+    <header class="pub-nav">
+      <a class="pub-brand" href="#/"><img src="${esc(brandURL('logo'))}" alt=""><span>${esc(s.mairie_name)}</span></a>
+      <nav class="pub-links" id="pubLinks">
+        <a href="#/" data-nav="home">Accueil</a>
+        <a href="#/annonces" data-nav="annonces">Annonces citoyennes</a>
+      </nav>
+      <a class="btn gold" href="#/connexion">Espace agents</a>
+    </header>
+    <main id="pubView"></main>
+    <footer class="pub-foot">
+      <b>${esc(s.mairie_name)}</b>
+      <div>${esc(s.pdf_extra || 'Nova Life RP')}</div>
+      <div class="small" style="margin-top:8px"><a href="#/connexion">Accès réservé aux agents</a></div>
+    </footer>
+  </div>`;
+}
+
+async function routePublic(m) {
+  if (cleanup) { try { cleanup(); } catch (e) { console.error(e); } cleanup = null; }
+  const id = ++renderId;
+  mode = 'public';
+  if (!$('#pubView')) drawPublicShell();
+  $$('#pubLinks a').forEach((a) => a.classList.toggle('active', a.dataset.nav === m.nav));
+  const view = $('#pubView');
+  view.innerHTML = '<div class="loading">Chargement…</div>';
+  window.scrollTo(0, 0);
+  try {
+    const mod = await import('./pages/landing.js');
+    if (id !== renderId) return;
+    await mod.default(view, { all: m.all });
+  } catch (e) {
+    console.error(e);
+    if (id === renderId) view.innerHTML = `<div class="section"><div class="card error"><h2>Erreur</h2><p>${esc(errMsg(e))}</p></div></div>`;
+  }
 }
 
 function drawShell() {
@@ -115,17 +205,13 @@ function drawShell() {
     go(v ? `#/mandats?q=${encodeURIComponent(v)}` : '#/mandats');
   });
   $('#bellBtn').onclick = (e) => { e.stopPropagation(); toggleNotifPanel(); };
-  document.addEventListener('click', (e) => {
-    const panel = $('#notifPanel');
-    if (panel && !panel.classList.contains('hide') && !panel.contains(e.target)) panel.classList.add('hide');
-  });
   renderBell();
 }
 
 function navItems() {
   const items = [
     { id: 'home', href: '#/', ico: '🏠', label: 'Accueil' },
-    { id: 'annonces', href: '#/annonces', ico: '📢', label: 'Annonces', count: state.notifs.filter((n) => !n.is_read && n.type === 'announcement').length },
+    { id: 'annonces', href: '#/annonces', ico: '📢', label: 'Annonces citoyennes', count: state.notifs.filter((n) => !n.is_read && n.type === 'announcement').length },
   ];
   const dossiers = [];
   if (can.viewMandates()) dossiers.push({ id: 'mandats', href: '#/mandats', ico: '📁', label: 'Mandats' });
@@ -158,8 +244,8 @@ function renderNav(active) {
   $$('a', nav).forEach((a) => a.addEventListener('click', () => $('#sidebar').classList.remove('open')));
 }
 
-async function route() {
-  if (!state.profile) return;
+async function routeApp() {
+  if (mode !== 'app' || !state.profile) return;
   const id = ++renderId;
   if (cleanup) { try { cleanup(); } catch (e) { console.error(e); } cleanup = null; }
 
@@ -262,8 +348,18 @@ function subscribeNotifs() {
     .subscribe();
 }
 
-sb.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT' && state.profile) { state.profile = null; showLogin('Session expirée. Veuillez vous reconnecter.'); }
+document.addEventListener('click', (e) => {
+  const panel = $('#notifPanel');
+  if (panel && !panel.classList.contains('hide') && !panel.contains(e.target)) panel.classList.add('hide');
 });
 
-start();
+window.addEventListener('hashchange', route);
+
+sb.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_OUT' && mode === 'app') {
+    state.profile = null;
+    showLogin('Session expirée. Veuillez vous reconnecter.');
+  }
+});
+
+boot();
