@@ -17,6 +17,7 @@ const stat = (ico, n, label, href, cls = '') => `
 const notifLink = (n) => {
   if (n.type === 'announcement') return '#/annonces';
   if (n.type === 'signup') return '#/utilisateurs';
+  if (n.type === 'contact' || n.type === 'contact_reply') return '#/messages';
   if (!n.mandate_id) return '#/';
   if (n.type === 'message' && can.conversations()) return `#/mandats/${n.mandate_id}/conversation`;
   return `#/mandats/${n.mandate_id}`;
@@ -53,7 +54,7 @@ export default async function render(view) {
         <div>
           <span class="eyebrow">${hour >= 18 || hour < 5 ? 'Bonsoir' : 'Bonjour'}</span>
           <h1>${esc(p.prenom)} ${esc(p.nom)}</h1>
-          <p>${esc(ROLE_LABEL[p.role] || 'Sans rôle')} · <span>Portail de ${esc(state.settings.mairie_name)}</span></p>
+          <p>${esc(ROLE_LABEL[p.role] || 'Citoyen')} · <span>Portail de ${esc(state.settings.mairie_name)}</span></p>
         </div>
         ${can.createMandate() ? '<a class="btn gold lg" href="#/mandats/nouveau">+ Nouvelle demande de mandat</a>' : ''}
       </section>`;
@@ -83,7 +84,7 @@ export default async function render(view) {
           ${stat('shield', nbPolice, 'Policiers', '#/police')}
           ${stat('badge', nbGn, 'Gendarmes', '#/gendarmerie')}
           ${stat('building', nbEmp, 'Employés de mairie', '#/utilisateurs')}
-          ${stat('userplus', nbPending, 'Inscriptions à valider', '#/utilisateurs', nbPending ? 'warn' : '')}
+          ${stat('userplus', nbPending, 'Comptes sans rôle', '#/utilisateurs', nbPending ? 'warn' : '')}
         </div>
         <div class="group-title">Activité</div>
         <div class="grid cols2">
@@ -174,6 +175,10 @@ export default async function render(view) {
           ${stat('xcircle', refusedN, 'Mandats refusés', '#/mandats?status=refuse', 'bad')}
         </div>
         <div class="card" style="margin-top:18px"><div class="card-head"><h2>Mandats récents</h2></div>${mandatesTable(recent.data || [])}</div>`;
+    } else if (!p.role) {
+      block = `<div class="card"><div class="card-head"><h2>${icon('send')} Contacter le maire</h2></div>
+        <p class="muted" style="margin-top:0">Une question, une demande ? Écrivez directement au maire. Les rôles (employé, Police, Gendarmerie) sont attribués par le maire.</p>
+        <a class="btn gold" href="#/messages">${icon('send')} Écrire au maire</a></div>`;
     } else {
       block = `<div class="card"><p class="muted" style="margin:0">Vous êtes connecté en tant que ${esc(ROLE_LABEL[p.role] || '')}. Les accès supplémentaires sont attribués par le maire.</p></div>`;
     }

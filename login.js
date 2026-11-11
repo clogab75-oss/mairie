@@ -64,7 +64,7 @@ export default function renderLogin(root, { notice = '', onDone }) {
       password: f.get('password'),
     });
     if (error) {
-      err.textContent = 'Identifiants incorrects.';
+      err.textContent = /confirm/i.test(String(error.message || '')) ? "E-mail non confirmé : désactivez « Confirm email » dans Supabase (Authentication > Sign In / Providers > Email)." : 'Identifiants incorrects.';
       err.classList.remove('hide');
       btn.disabled = false;
       btn.textContent = 'Se connecter';

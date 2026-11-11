@@ -82,7 +82,6 @@ export async function loadSession() {
   state.user = session.user;
   const { data: me, error } = await sb.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
   if (error || !me) return 'missing';
-  if (!me.role) return 'pending';
   if (!me.is_active) return 'inactive';
   state.profile = me;
   await Promise.all([loadProfiles(), loadSettings(), loadNotifications()]);

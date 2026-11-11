@@ -3,7 +3,7 @@ import { esc, loginEmailFrom, slug } from './lib.js';
 import { brandURL } from './branding.js';
 import { icon } from './icons.js';
 
-export default function renderSignup(root) {
+export default function renderSignup(root, { onDone }) {
   root.innerHTML = `
   <div class="login-split">
     <aside class="login-art">
@@ -67,7 +67,7 @@ export default function renderSignup(root) {
     const btn = root.querySelector('#signupBtn');
     btn.disabled = true;
     btn.textContent = 'Création…';
-    const { error } = await sb.auth.signUp({
+    const { data, error } = await sb.auth.signUp({
       email: loginEmailFrom(prenom, nom),
       password,
       options: { data: { prenom, nom } },
@@ -80,11 +80,12 @@ export default function renderSignup(root) {
       if (/signups? (are )?(not allowed|disabled)/i.test(msg)) return fail("Les inscriptions sont fermées pour le moment.");
       return fail("Impossible de créer le compte. Réessayez dans un instant.");
     }
-    await sb.auth.signOut();
-    root.querySelector('.login-form').innerHTML = `
-      <div class="done-icon">${icon('checkcircle')}</div>
-      <h2>Compte créé</h2>
-      <p class="sub">Bienvenue ${esc(prenom)}. Votre inscription est enregistrée : le maire doit maintenant la valider et vous attribuer un rôle. Tant que ce n'est pas fait, la connexion est refusée. Revenez ensuite vous connecter avec votre prénom, votre nom et votre mot de passe.</p>
-      <a class="btn gold lg" style="width:100%" href="#/">Retour à l'accueil</a>`;
+    if (!data?.session) {
+      btn.disabled = false;
+      btn.textContent = 'Créer mon compte';
+      if (data?.user && Array.isArray(data.user.identities) && !data.user.identities.length) return fail('Un compte existe déjà pour ce nom.');
+      return fail("Création impossible : la confirmation par e-mail est activée sur Supabase. Le maire doit la désactiver (Authentication > Sign In / Providers > Email > Confirm email).");
+    }
+    await onDone();
   };
 }

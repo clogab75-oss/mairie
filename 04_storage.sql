@@ -62,7 +62,7 @@ create policy "announcements_delete" on storage.objects for delete to authentica
 do $$
 declare t text;
 begin
-  foreach t in array array['mandate_messages','mandate_files','mandate_reads','notifications','mandates','announcements','mandate_members','mandate_complices','mandate_terrains','mandate_vehicles']
+  foreach t in array array['mandate_messages','mandate_files','mandate_reads','notifications','mandates','announcements','mandate_members','mandate_complices','mandate_terrains','mandate_vehicles','contact_messages']
   loop
     begin
       execute format('alter publication supabase_realtime add table public.%I', t);

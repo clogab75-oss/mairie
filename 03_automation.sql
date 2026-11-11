@@ -391,11 +391,11 @@ create or replace function public.profiles_after_insert() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
   if new.role is null and auth.uid() is null then
-    perform public.notify_mayors('signup', 'Nouvelle inscription',
-      new.prenom || ' ' || new.nom || ' attend votre validation.', null);
+    perform public.notify_mayors('signup', 'Nouveau compte',
+      new.prenom || ' ' || new.nom || ' a créé un compte. Vous pouvez lui attribuer un rôle.', null);
     perform public.discord_notify('signup',
-      E'🆕 **NOUVELLE INSCRIPTION**\n\n' || new.prenom || ' ' || new.nom
-      || E' vient de créer un compte.\nAttribuez-lui un rôle dans la page Utilisateurs.');
+      E'🆕 **NOUVEAU COMPTE**\n\n' || new.prenom || ' ' || new.nom
+      || E' vient de créer un compte.\nVous pouvez lui attribuer un rôle dans la page Utilisateurs.');
   end if;
   return new;
 end $$;
@@ -403,3 +403,64 @@ end $$;
 drop trigger if exists profiles_after_insert_trg on public.profiles;
 create trigger profiles_after_insert_trg after insert on public.profiles
 for each row execute function public.profiles_after_insert();
+
+create or replace function public.contact_before_insert() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  new.author_name := (select prenom || ' ' || nom from public.profiles where id = new.user_id);
+  new.reply := null;
+  new.replied_by_name := null;
+  new.replied_at := null;
+  new.is_read := false;
+  return new;
+end $$;
+
+drop trigger if exists contact_before_insert_trg on public.contact_messages;
+create trigger contact_before_insert_trg before insert on public.contact_messages
+for each row execute function public.contact_before_insert();
+
+create or replace function public.contact_after_insert() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  perform public.notify_mayors('contact', 'Nouveau message', new.author_name || ' : ' || new.subject, null);
+  perform public.discord_notify('signup',
+    E'✉️ **NOUVEAU MESSAGE AU MAIRE**\n\nDe : ' || new.author_name || E'\nObjet : ' || new.subject);
+  return new;
+end $$;
+
+drop trigger if exists contact_after_insert_trg on public.contact_messages;
+create trigger contact_after_insert_trg after insert on public.contact_messages
+for each row execute function public.contact_after_insert();
+
+create or replace function public.contact_before_update() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  new.user_id := old.user_id;
+  new.author_name := old.author_name;
+  new.subject := old.subject;
+  new.body := old.body;
+  if new.reply is distinct from old.reply and coalesce(btrim(new.reply), '') <> '' then
+    new.replied_by_name := (select prenom || ' ' || nom from public.profiles where id = auth.uid());
+    new.replied_at := now();
+    new.is_read := true;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists contact_before_update_trg on public.contact_messages;
+create trigger contact_before_update_trg before update on public.contact_messages
+for each row execute function public.contact_before_update();
+
+create or replace function public.contact_after_update() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.reply is distinct from old.reply and coalesce(btrim(new.reply), '') <> '' then
+    insert into public.notifications (user_id, type, title, body)
+    values (new.user_id, 'contact_reply', 'Réponse du maire', new.subject);
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists contact_after_update_trg on public.contact_messages;
+create trigger contact_after_update_trg after update on public.contact_messages
+for each row execute function public.contact_after_update();

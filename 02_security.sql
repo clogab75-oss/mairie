@@ -88,7 +88,7 @@ begin
     coalesce(nullif(new.raw_user_meta_data ->> 'prenom',''), 'Inconnu'),
     coalesce(nullif(new.raw_user_meta_data ->> 'nom',''), 'Inconnu'),
     new.email,
-    false
+    true
   )
   on conflict (id) do nothing;
   return new;
@@ -306,6 +306,7 @@ alter table public.settings           enable row level security;
 alter table public.private_settings   enable row level security;
 alter table public.mandate_counters   enable row level security;
 alter table public.announcements      enable row level security;
+alter table public.contact_messages   enable row level security;
 
 do $$
 declare r record;
@@ -319,6 +320,15 @@ create policy roles_select on public.roles for select to authenticated using (tr
 
 create policy profiles_select on public.profiles for select to authenticated
   using (id = auth.uid() or public.is_active_user());
+
+create policy contact_select on public.contact_messages for select to authenticated
+  using (user_id = auth.uid() or public.is_mayor());
+create policy contact_insert on public.contact_messages for insert to authenticated
+  with check (user_id = auth.uid());
+create policy contact_update on public.contact_messages for update to authenticated
+  using (public.is_mayor()) with check (public.is_mayor());
+create policy contact_delete on public.contact_messages for delete to authenticated
+  using (public.is_mayor() or user_id = auth.uid());
 
 create policy mandates_select on public.mandates for select to authenticated
   using (public.can_read_mandate(id));
@@ -605,3 +615,5 @@ grant execute on function public.admin_set_password(uuid,text) to authenticated;
 grant execute on function public.admin_delete_user(uuid) to authenticated;
 grant execute on function public.touch_login() to authenticated;
 grant execute on function public.search_mandates(text,text,text,date,date) to authenticated;
+
+update public.profiles set is_active = true where role is null and not is_active;

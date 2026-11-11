@@ -152,6 +152,20 @@ create table if not exists public.notifications (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.contact_messages (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  author_name text,
+  subject text not null check (char_length(subject) between 1 and 150),
+  body text not null check (char_length(body) between 1 and 3000),
+  reply text,
+  replied_by_name text,
+  replied_at timestamptz,
+  is_read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists contact_messages_user_idx on public.contact_messages (user_id, created_at desc);
+
 create table if not exists public.settings (
   key text primary key,
   value jsonb,

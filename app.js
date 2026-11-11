@@ -16,6 +16,7 @@ const ROUTES = [
   { re: /^\/gendarmerie$/, page: 'service', service: 'gendarmerie', nav: 'gendarmerie', ok: () => can.viewMandates() },
   { re: /^\/documents$/, page: 'documents', nav: 'documents', ok: () => can.documents() },
   { re: /^\/historique$/, page: 'history', nav: 'historique', ok: () => can.history() },
+  { re: /^\/messages$/, page: 'messages', nav: 'messages', ok: () => true },
   { re: /^\/utilisateurs$/, page: 'users', nav: 'utilisateurs', ok: () => can.mayor() },
   { re: /^\/parametres$/, page: 'settings', nav: 'parametres', ok: () => can.mayor() },
 ];
@@ -73,16 +74,15 @@ async function logout() {
   if (location.hash === '#/' || !location.hash) route(); else location.hash = '#/';
 }
 
-const PENDING_MSG = 'Votre compte est en attente de validation par le maire.';
 const INACTIVE_MSG = 'Votre compte est désactivé. Contactez le maire.';
 
 async function afterLogin() {
   let res;
   try { res = await loadSession(); } catch (e) { return showLogin(`Erreur de chargement : ${errMsg(e)}`); }
   if (res === true) return enterApp();
-  if (res === 'pending' || res === 'inactive' || res === 'missing') {
+  if (res === 'inactive' || res === 'missing') {
     await sb.auth.signOut();
-    return showLogin(res === 'pending' ? PENDING_MSG : res === 'inactive' ? INACTIVE_MSG : 'Profil introuvable. Contactez le maire.');
+    return showLogin(res === 'inactive' ? INACTIVE_MSG : 'Profil introuvable. Contactez le maire.');
   }
   return showLogin();
 }
@@ -103,9 +103,9 @@ async function boot() {
   let res = false;
   try { res = await loadSession(); } catch (e) { console.error(e); }
   if (res === true) { mode = 'app'; drawShell(); subscribeNotifs(); route(); return; }
-  if (res === 'pending' || res === 'inactive' || res === 'missing') {
+  if (res === 'inactive' || res === 'missing') {
     await sb.auth.signOut();
-    pendingNotice = res === 'pending' ? PENDING_MSG : res === 'inactive' ? INACTIVE_MSG : 'Profil introuvable. Contactez le maire.';
+    pendingNotice = res === 'inactive' ? INACTIVE_MSG : 'Profil introuvable. Contactez le maire.';
     mode = 'public';
     location.hash = '#/connexion';
   }
@@ -204,7 +204,7 @@ function drawShell() {
       <nav class="nav" id="nav"></nav>
       <div class="side-user">
         <div class="avatar">${esc(initials(p.prenom, p.nom))}</div>
-        <div class="who"><b>${esc(p.prenom)} ${esc(p.nom)}</b><small>${esc(ROLE_LABEL[p.role] || '')} · ${esc(ROLE_SERVICE[p.role] || '')}</small></div>
+        <div class="who"><b>${esc(p.prenom)} ${esc(p.nom)}</b><small>${p.role ? `${esc(ROLE_LABEL[p.role])} · ${esc(ROLE_SERVICE[p.role])}` : 'Citoyen'}</small></div>
         <button class="icon-btn" id="logoutBtn" title="Se déconnecter" aria-label="Se déconnecter">${icon('logout')}</button>
       </div>
     </aside>
@@ -243,6 +243,9 @@ function navItems() {
     { id: 'site', href: '#/accueil', ico: 'globe', label: 'Accueil du site' },
     { id: 'annonces', href: '#/annonces', ico: 'megaphone', label: 'Annonces citoyennes', count: state.notifs.filter((n) => !n.is_read && n.type === 'announcement').length },
   ];
+  items.push(can.mayor()
+    ? { id: 'messages', href: '#/messages', ico: 'chat', label: 'Messages reçus', count: state.notifs.filter((n) => !n.is_read && n.type === 'contact').length }
+    : { id: 'messages', href: '#/messages', ico: 'send', label: 'Contacter le maire', count: state.notifs.filter((n) => !n.is_read && n.type === 'contact_reply').length });
   const dossiers = [];
   if (can.viewMandates()) dossiers.push({ id: 'mandats', href: '#/mandats', ico: 'folder', label: 'Mandats' });
   if (can.conversations()) dossiers.push({ id: 'conversations', href: '#/conversations', ico: 'chat', label: 'Conversations', count: unreadMessages() });
@@ -255,7 +258,7 @@ function navItems() {
   if (can.history()) archives.push({ id: 'historique', href: '#/historique', ico: 'history', label: 'Historique' });
   const admin = [];
   if (can.mayor()) {
-    admin.push({ id: 'utilisateurs', href: '#/utilisateurs', ico: 'users', label: 'Utilisateurs', count: [...state.profiles.values()].filter((p) => !p.role).length });
+    admin.push({ id: 'utilisateurs', href: '#/utilisateurs', ico: 'users', label: 'Utilisateurs' });
     admin.push({ id: 'parametres', href: '#/parametres', ico: 'settings', label: 'Paramètres' });
   }
   return { items, groups: [['Dossiers', dossiers], ['Archives', archives], ['Administration', admin]] };
@@ -328,6 +331,7 @@ function renderBell() {
 function notifTarget(n) {
   if (n.type === 'announcement') return '#/annonces';
   if (n.type === 'signup') return '#/utilisateurs';
+  if (n.type === 'contact' || n.type === 'contact_reply') return '#/messages';
   if (!n.mandate_id) return '#/';
   if (n.type === 'message' && can.conversations()) return `#/mandats/${n.mandate_id}/conversation`;
   return `#/mandats/${n.mandate_id}`;

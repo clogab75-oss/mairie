@@ -17,7 +17,7 @@ export default async function render(view) {
 
   view.innerHTML = `
     <div class="page-head">
-      <div><h1>Gestion des utilisateurs</h1><p>Les visiteurs peuvent créer un compte : vous validez les inscriptions et attribuez les rôles.</p></div>
+      <div><h1>Gestion des utilisateurs</h1><p>Tout le monde peut créer un compte citoyen : vous attribuez ensuite les rôles (employé, Police, Gendarmerie).</p></div>
       <button class="btn gold" id="newUser">${icon('plus')} Nouvel utilisateur</button>
     </div>
     <div id="pendingBox"></div>
@@ -39,12 +39,12 @@ export default async function render(view) {
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     if (!list.length) { pendingBox.innerHTML = ''; return; }
     pendingBox.innerHTML = `<div class="card pending-card">
-      <div class="card-head"><h2>${icon('userplus')} Inscriptions à valider</h2></div>
+      <div class="card-head"><h2>${icon('userplus')} Comptes citoyens sans rôle</h2></div>
       ${list.map((p) => `<div class="list-item">
         <div><b>${esc(p.prenom)} ${esc(p.nom)}</b><div class="muted small">Inscrit le ${esc(fmtDT(p.created_at))}</div></div>
         <div class="btn-row">
-          <button class="btn sm gold" data-act="edit" data-id="${esc(p.id)}">${icon('check')} Valider et attribuer un rôle</button>
-          <button class="btn sm bad" data-act="del" data-id="${esc(p.id)}">${icon('x')} Refuser</button>
+          <button class="btn sm gold" data-act="edit" data-id="${esc(p.id)}">${icon('check')} Attribuer un rôle</button>
+          <button class="btn sm bad" data-act="del" data-id="${esc(p.id)}">${icon('trash')} Supprimer</button>
         </div></div>`).join('')}
     </div>`;
   }
@@ -100,7 +100,7 @@ export default async function render(view) {
     const isMaire = u?.role === 'maire';
     const roles = isMaire ? ['maire'] : ASSIGNABLE_ROLES;
     const m = openModal({
-      title: editing ? (u.role ? `Modifier ${u.prenom} ${u.nom}` : `Valider l'inscription de ${u.prenom} ${u.nom}`) : 'Nouvel utilisateur',
+      title: editing ? (u.role ? `Modifier ${u.prenom} ${u.nom}` : `Attribuer un rôle à ${u.prenom} ${u.nom}`) : 'Nouvel utilisateur',
       body: `<form id="uForm" autocomplete="off">
         <div class="grid2">
           <label>Prénom RP<input name="prenom" required value="${esc(u?.prenom || '')}"></label>
@@ -114,7 +114,7 @@ export default async function render(view) {
           ${roles.map((r) => `<option value="${r}" ${u?.role === r ? 'selected' : ''}>${esc(ROLE_LABEL[r])}</option>`).join('')}</select></label>
         <div id="permBox" class="hide"><div class="muted small" style="margin-bottom:6px">Accès accordés à cet employé de mairie :</div>${permsHtml(u?.permissions)}</div>
       </form>`,
-      footer: `<button class="btn ghost" data-close>Annuler</button><button class="btn gold" id="uSave">${editing && !u.role ? 'Valider le compte' : 'Enregistrer'}</button>`,
+      footer: `<button class="btn ghost" data-close>Annuler</button><button class="btn gold" id="uSave">${editing && !u.role ? 'Attribuer le rôle' : 'Enregistrer'}</button>`,
     });
 
     const form = m.q('#uForm');
@@ -132,7 +132,7 @@ export default async function render(view) {
       try {
         if (editing) {
           await rpc('admin_update_user', { p_id: u.id, p_prenom: form.prenom.value.trim(), p_nom: form.nom.value.trim(), p_role: role, p_permissions });
-          toast(u.role ? 'Compte modifié.' : 'Compte validé.', 'ok');
+          toast(u.role ? 'Compte modifié.' : 'Rôle attribué.', 'ok');
         } else {
           await rpc('admin_create_user', { p_prenom: form.prenom.value.trim(), p_nom: form.nom.value.trim(), p_password: form.password.value, p_role: role, p_permissions });
           toast('Compte créé.', 'ok');
