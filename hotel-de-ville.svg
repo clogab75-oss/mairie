@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 380" fill="none" stroke="#e6c660" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <g transform="translate(0 20)">
+    <path d="M14 340h492" stroke-width="3"/>
+    <path d="M186 340v-8h148v8M176 332v-8h168v8" opacity=".8"/>
+    <rect x="34" y="214" width="140" height="110" fill="#ffffff" fill-opacity=".08"/>
+    <rect x="346" y="214" width="140" height="110" fill="#ffffff" fill-opacity=".08"/>
+    <path d="M26 214l20-26h108l20 26M334 214l20-26h108l20 26" fill="#ffffff" fill-opacity=".08"/>
+    <g opacity=".9">
+      <rect x="52" y="236" width="18" height="30" rx="9"/><rect x="88" y="236" width="18" height="30" rx="9"/><rect x="124" y="236" width="18" height="30" rx="9"/>
+      <rect x="52" y="280" width="18" height="30" rx="9"/><rect x="88" y="280" width="18" height="30" rx="9"/><rect x="124" y="280" width="18" height="30" rx="9"/>
+      <rect x="378" y="236" width="18" height="30" rx="9"/><rect x="414" y="236" width="18" height="30" rx="9"/><rect x="450" y="236" width="18" height="30" rx="9"/>
+      <rect x="378" y="280" width="18" height="30" rx="9"/><rect x="414" y="280" width="18" height="30" rx="9"/><rect x="450" y="280" width="18" height="30" rx="9"/>
+    </g>
+    <rect x="168" y="150" width="184" height="174" fill="#ffffff" fill-opacity=".08"/>
+    <path d="M156 150L260 96l104 54z" fill="#ffffff" fill-opacity=".08"/>
+    <circle cx="260" cy="128" r="12"/>
+    <path d="M260 120v8l5 3"/>
+    <rect x="232" y="44" width="56" height="52" fill="#ffffff" fill-opacity=".08"/>
+    <path d="M224 44l36-30 36 30z" fill="#ffffff" fill-opacity=".08"/>
+    <circle cx="260" cy="68" r="15"/>
+    <path d="M260 58v10l7 5"/>
+    <path d="M260 14V-6" stroke-width="2.4"/>
+    <path d="M260 -6h26v14h-26z" fill="#d33a3a" stroke="none" opacity=".9"/>
+    <path d="M260 -6h9v14h-9z" fill="#2b55c4" stroke="none"/>
+    <g fill="#ffffff" fill-opacity=".08">
+      <rect x="184" y="166" width="12" height="150"/><rect x="222" y="166" width="12" height="150"/>
+      <rect x="286" y="166" width="12" height="150"/><rect x="324" y="166" width="12" height="150"/>
+    </g>
+    <path d="M246 324v-42a14 14 0 0 1 28 0v42" fill="#ffffff" fill-opacity=".08"/>
+    <path d="M168 150h184"/>
+    <path d="M30 340c8-26 8-40 0-58M490 340c-8-26-8-40 0-58" opacity=".5"/>
+  </g>
+</svg>

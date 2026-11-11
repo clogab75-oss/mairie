@@ -78,7 +78,8 @@ Le bucket des annonces est public pour que Discord puisse afficher l'image dans 
 Dans **Authentication → Sign In / Providers** :
 
 1. Laissez le fournisseur **Email** activé (il sert d'identifiant interne).
-2. Désactivez **Allow new users to sign up** : seuls les comptes créés par le maire doivent exister.
+2. Laissez **Allow new users to sign up** activé : les visiteurs peuvent créer un compte depuis le site. Leur compte reste bloqué tant que le maire ne leur a pas attribué un rôle.
+3. Dans **Authentication → Sign In / Providers → Email**, désactivez **Confirm email** : aucun e-mail réel n'est utilisé.
 
 Les utilisateurs se connectent avec leur prénom, leur nom et leur mot de passe. En interne, le site convertit `Gabin` + `Muller` en identifiant `gabin.muller@amboise-rp.fr`. Cet identifiant n'est jamais affiché et aucun e-mail n'est envoyé. Les mots de passe sont chiffrés par Supabase, jamais stockés en clair.
 
@@ -133,9 +134,14 @@ Le site utilise des adresses du type `#/mandats`, ce qui est compatible avec Git
 
 - **Mandats** : un chef Police ou Gendarmerie crée la demande, choisit les agents (Police et Gendarmerie) qui auront accès au dossier et à sa conversation, puis le maire accepte ou refuse. Un mandat accepté reste modifiable, chaque changement est enregistré dans l'historique.
 - **Conversation** : messages en temps réel, photos JPG, PNG, WEBP et PDF, aperçu, téléchargement, statut de lecture.
-- **PDF** : le bouton *Télécharger l'autorisation de perquisition* apparaît sur un mandat accepté.
+- **PDF** : le bouton *Autorisation (PDF)* apparaît sur un mandat accepté ou clôturé.
 - **Page d'accueil publique** : tout visiteur voit les annonces citoyennes sans se connecter (`#/` et `#/annonces`). L'espace agents se trouve sous le bouton « Espace agents » (`#/connexion`).
 - **Annonces citoyennes** : le maire publie une annonce (titre, catégorie Information, Événement, Travaux, Sécurité ou Urgent, texte, image facultative). Elle apparaît sur l'accueil public et dans le portail, et part sur Discord via le webhook des annonces.
+- **Inscription libre** : n'importe qui peut créer un compte (prénom RP, nom RP, mot de passe). Le compte est en attente : le maire reçoit une notification, ouvre **Utilisateurs → Inscriptions à valider**, attribue un rôle (employé, policier, gendarme, chef…) ou refuse. Seul le maire peut changer un rôle.
+- **Clôture d'un mandat** : un mandat accepté peut être clôturé par le maire ou par le chef concerné, avec un bilan. Il devient alors non modifiable et la conversation passe en lecture seule. Seul le maire peut le rouvrir.
+- **Pièces saisies** : sur une photo du dossier, le bouton boîte permet de la marquer comme saisie et d'ajouter une légende.
+- **Rapport de clôture (PDF)** : disponible sur un mandat clôturé. Il reprend le bilan, les personnes, terrains, véhicules, les photos des pièces saisies, les autres photos, les documents joints et la chronologie du dossier.
+- **Accueil du site** : même connecté, le lien « Accueil du site » du menu ouvre la page publique, et « Mon portail » ramène au tableau de bord.
 - **Employés de mairie** : le maire choisit les accès de chaque employé (mandats, documents, historique) à la création ou à la modification du compte.
 - **Paramètres** : nom de la mairie et du maire, logo, tampon, signature, webhooks Discord, numérotation des mandats, textes du PDF.
 
@@ -144,6 +150,9 @@ Le site utilise des adresses du type `#/mandats`, ce qui est compatible avec Git
 | Problème | Solution |
 |---|---|
 | « Identifiants incorrects » | Vérifiez l'orthographe du prénom et du nom (les accents et majuscules sont ignorés) et que `LOGIN_DOMAIN` est identique côté site et côté SQL |
+| « Un compte existe déjà pour ce nom » à l'inscription | Ce prénom et ce nom sont déjà pris : le maire peut supprimer l'ancien compte ou en modifier le nom |
+| Inscription impossible | Vérifiez que « Allow new users to sign up » est activé et « Confirm email » désactivé |
+| Erreur SQL « function is not unique » | Rejouez `03_automation.sql` : il supprime les anciennes versions des fonctions Discord |
 | Page blanche | Ouvrez la console du navigateur (F12) et vérifiez les valeurs de `js/config.js` |
 | Aucun message Discord | Utilisez le bouton de test, vérifiez l'URL du webhook et que l'extension `pg_net` est activée |
 | Messages non reçus en temps réel | Relancez `04_storage.sql` (il active Realtime sur les tables concernées) |
