@@ -193,4 +193,5 @@ export default async function render(view) {
   pendingBox.addEventListener('click', onAct);
 
   paint();
+  refresh().catch(() => {});
 }

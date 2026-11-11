@@ -84,7 +84,7 @@ export default function renderSignup(root) {
     root.querySelector('.login-form').innerHTML = `
       <div class="done-icon">${icon('checkcircle')}</div>
       <h2>Compte créé</h2>
-      <p class="sub">Bienvenue ${esc(prenom)}. Le maire doit maintenant valider votre compte et vous attribuer un rôle. Vous pourrez ensuite vous connecter avec votre prénom, votre nom et votre mot de passe.</p>
-      <a class="btn gold lg" style="width:100%" href="#/connexion">Aller à la connexion</a>`;
+      <p class="sub">Bienvenue ${esc(prenom)}. Votre inscription est enregistrée : le maire doit maintenant la valider et vous attribuer un rôle. Tant que ce n'est pas fait, la connexion est refusée. Revenez ensuite vous connecter avec votre prénom, votre nom et votre mot de passe.</p>
+      <a class="btn gold lg" style="width:100%" href="#/">Retour à l'accueil</a>`;
   };
 }
